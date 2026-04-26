@@ -37,10 +37,16 @@ export default function LoginPage() {
 
  const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault()
+
+  console.log('LOGIN SUBMIT', { email })
+
   setLoading(true)
 
   try {
     const cred = await signInWithEmailAndPassword(auth, email, password)
+
+    console.log('FIREBASE LOGIN OK', cred.user.uid)
+
     const idToken = await cred.user.getIdToken()
 
     const res = await fetch('/api/auth/session', {
@@ -49,17 +55,25 @@ export default function LoginPage() {
       body: JSON.stringify({ idToken }),
     })
 
+    const data = await res.json().catch(() => null)
+
+    console.log('SESSION RESPONSE', res.status, data)
+
     if (!res.ok) {
-      const data = await res.json().catch(() => null)
       throw new Error(data?.error || 'Erreur de création de session')
     }
 
     router.refresh()
     router.push('/')
   } catch (err) {
+    console.error('LOGIN ERROR', err)
+
     toast({
       title: 'Connexion échouée',
-      description: err instanceof Error ? err.message : 'Identifiants invalides.',
+      description:
+        err instanceof Error
+          ? err.message
+          : 'Identifiants invalides.',
       variant: 'destructive',
     })
   } finally {

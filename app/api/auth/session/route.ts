@@ -4,49 +4,63 @@ import { adminAuth, adminDb } from '@/lib/firebase/admin'
 export async function POST(request: NextRequest) {
   try {
     const { idToken } = await request.json()
+
+    if (!idToken) {
+      return NextResponse.json(
+        { error: 'idToken manquant' },
+        { status: 400 }
+      )
+    }
+
     const decoded = await adminAuth.verifyIdToken(idToken)
 
-    // ✅ Vérifier si la collection "admin" est vide (premier utilisateur)
-    const adminCollection = await adminDb.collection('admin').limit(1).get()
+    const userRef = adminDb.collection('users').doc(decoded.uid)
+    const userSnap = await userRef.get()
 
-    if (adminCollection.empty) {
-      // Premier utilisateur → créer son document dans "admin"
-      await adminDb.collection('admin').doc(decoded.uid).set({
+    if (!userSnap.exists) {
+      await userRef.set({
         uid: decoded.uid,
-        email: decoded.email,
+        email: decoded.email ?? null,
+        fullName: decoded.name ?? '',
+        role: 'user',
+        emailVerified: decoded.email_verified ?? false,
         createdAt: new Date(),
-        role: 'admin',
       })
-    } else {
-      // Pas le premier → vérifier s'il est dans la collection "admin"
-      const adminDoc = await adminDb.collection('admin').doc(decoded.uid).get()
-      if (!adminDoc.exists) {
-        return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 })
-      }
     }
 
     const expiresIn = 60 * 60 * 24 * 7 * 1000
-    const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn })
 
-    const response = NextResponse.json({ success: true })
+    const sessionCookie = await adminAuth.createSessionCookie(idToken, {
+      expiresIn,
+    })
+
+    const response = NextResponse.json({
+      success: true,
+      uid: decoded.uid,
+    })
+
     response.cookies.set('session', sessionCookie, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: expiresIn / 1000,
-      path: '/',
       sameSite: 'lax',
+      path: '/',
+      maxAge: expiresIn / 1000,
     })
-    return response
- } catch (error) {
-  console.error('Session creation error:', error)
 
-  return NextResponse.json(
-    {
-      error: error instanceof Error ? error.message : 'Authentication failed'
-    },
-    { status: 401 }
-  )
-}
+    return response
+  } catch (error) {
+    console.error('Session creation error:', error)
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Authentication failed',
+      },
+      { status: 401 }
+    )
+  }
 }
 
 export async function DELETE() {
