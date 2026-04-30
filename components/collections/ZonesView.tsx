@@ -20,6 +20,8 @@ interface ZonesViewProps {
   measuresMap: Record<string, Measure[]>
 }
 
+type ZoneWithPlant = Zone & { plant_type?: string }
+
 function getHealthColor(sante: number) {
   if (sante >= 8) return { bg: '#dcfce7', text: '#16a34a' }
   if (sante >= 5) return { bg: '#fef9c3', text: '#ca8a04' }
@@ -37,10 +39,19 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<Record<string, string>>({})
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
-  const [plantTypes, setPlantTypes] = useState<Record<string, string>>({})
   const [savingPlant, setSavingPlant] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const { toast } = useToast()
+
+  // ✅ CORRECTION 1 — initialiser plantTypes avec les valeurs existantes de Firestore
+  const [plantTypes, setPlantTypes] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {}
+    Object.entries(zones).forEach(([zoneId, zone]) => {
+      const z = zone as ZoneWithPlant
+      if (z.plant_type) initial[zoneId] = z.plant_type
+    })
+    return initial
+  })
 
   const toggleExpand = (zoneId: string) => {
     setExpandedZones(prev => {
@@ -50,7 +61,7 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
     })
   }
 
-  const getTab = (zoneId: string) => activeTab[zoneId] || 'data'
+  const getTab = (zoneId: string) => activeTab[zoneId] || 'Humidité'
   const setTab = (zoneId: string, tab: string) =>
     setActiveTab(prev => ({ ...prev, [zoneId]: tab }))
 
@@ -71,9 +82,15 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
     }
   }
 
+  // ✅ CORRECTION 2 — handleSavePlantType corrigé
   const handleSavePlantType = async (zoneId: string) => {
+    // Permet la valeur vide string mais bloque undefined
     const plantType = plantTypes[zoneId]
-    if (!plantType) return
+    if (plantType === undefined) {
+      toast({ title: 'Erreur', description: 'Veuillez saisir un type de plante', variant: 'destructive' })
+      return
+    }
+
     setSavingPlant(prev => ({ ...prev, [zoneId]: true }))
     try {
       const res = await fetch(`/api/users/${uid}/zones/${zoneId}`, {
@@ -81,11 +98,24 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plant_type: plantType }),
       })
-      if (!res.ok) throw new Error()
+
+      // ✅ CORRECTION 3 — afficher l'erreur exacte de l'API
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        console.error('❌ Erreur API:', res.status, data)
+        throw new Error(data?.error || `Erreur ${res.status}`)
+      }
+
+      console.log('✅ plant_type sauvegardé:', plantType, 'pour zone:', zoneId)
       toast({ title: '✅ Type de plante sauvegardé !' })
       router.refresh()
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de sauvegarder', variant: 'destructive' })
+    } catch (e) {
+      console.error('❌ handleSavePlantType:', e)
+      toast({
+        title: 'Erreur',
+        description: e instanceof Error ? e.message : 'Impossible de sauvegarder',
+        variant: 'destructive'
+      })
     } finally {
       setSavingPlant(prev => ({ ...prev, [zoneId]: false }))
     }
@@ -109,14 +139,14 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
   const entries = Object.entries(zones)
   if (entries.length === 0) {
     return (
-      <div style={{textAlign:'center', padding:'48px', color:'#94a3b8', background:'white', borderRadius:16}}>
+      <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8', background: 'white', borderRadius: 16 }}>
         Aucune zone trouvée
       </div>
     )
   }
 
   return (
-    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(520px, 1fr))', gap:20}}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(520px, 1fr))', gap: 20 }}>
       {entries.map(([zoneId, zone]) => {
         const health = getHealthColor(zone.sante)
         const measures = (measuresMap[zoneId] || []).slice().reverse()
@@ -138,14 +168,14 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
             boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
             overflow: 'hidden',
           }}>
-            {/* Header */}
+            {/* ── Header ── */}
             <div style={{
               padding: '16px 20px',
               borderBottom: '1px solid #f1f5f9',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: 'linear-gradient(135deg, #f0fdf4 0%, #f8fafc 100%)',
             }}>
-              <div style={{display:'flex', alignItems:'center', gap:10}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10,
                   background: '#dcfce7',
@@ -154,15 +184,19 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                   <Leaf size={18} color="#16a34a" />
                 </div>
                 <div>
-                  <div style={{fontWeight:700, fontSize:15, color:'#0f172a', fontFamily:'monospace'}}>{zoneId}</div>
-                  <div style={{fontSize:11, color:'#94a3b8', marginTop:2}}>
+                  {/* ✅ Affiche "Tomate" si plant_type défini, sinon "zone1" */}
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', fontFamily: 'monospace' }}>
+                    {plantTypes[zoneId]
+                      ? `${zoneId} — ${plantTypes[zoneId]}`
+                      : zoneId}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                     Mis à jour : {formatTime(zone.last_updated)}
                   </div>
                 </div>
               </div>
 
-              <div style={{display:'flex', alignItems:'center', gap:8}}>
-                {/* Health badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{
                   background: health.bg, color: health.text,
                   borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600,
@@ -170,7 +204,6 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                   Santé {zone.sante}/10
                 </span>
 
-                {/* Pump toggle */}
                 <button
                   onClick={() => handleTogglePump(zoneId, !zone.enabled)}
                   disabled={loadingStates[zoneId]}
@@ -186,7 +219,6 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                   {zone.enabled ? 'Pompe ON' : 'Pompe OFF'}
                 </button>
 
-                {/* Delete */}
                 <button
                   onClick={() => handleDelete(zoneId)}
                   disabled={loadingStates[zoneId]}
@@ -200,30 +232,30 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
               </div>
             </div>
 
-            {/* Metrics */}
+            {/* ── Metrics ── */}
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)',
               gap: 0, borderBottom: '1px solid #f1f5f9',
             }}>
               {[
-                { icon: <Droplets size={16} color="#3b82f6"/>, label: 'Humidité', value: `${zone.humidity?.toFixed(1)}%`, color: '#3b82f6' },
-                { icon: <Thermometer size={16} color="#f97316"/>, label: 'Temp', value: `${zone.temperature?.toFixed(1)}°`, color: '#f97316' },
-                { icon: <Zap size={16} color="#eab308"/>, label: 'EC', value: zone.ec?.toFixed(2), color: '#eab308' },
-                { icon: <FlaskConical size={16} color="#a855f7"/>, label: 'pH', value: zone.ph?.toFixed(2), color: '#a855f7' },
-                { icon: <Activity size={16} color="#14b8a6"/>, label: 'Capteurs', value: zone.sensor_count, color: '#14b8a6' },
+                { icon: <Droplets size={16} color="#3b82f6" />, label: 'Humidité', value: `${zone.humidity?.toFixed(1)}%`, color: '#3b82f6' },
+                { icon: <Thermometer size={16} color="#f97316" />, label: 'Temp', value: `${zone.temperature?.toFixed(1)}°`, color: '#f97316' },
+                { icon: <Zap size={16} color="#eab308" />, label: 'EC', value: zone.ec?.toFixed(2), color: '#eab308' },
+                { icon: <FlaskConical size={16} color="#a855f7" />, label: 'pH', value: zone.ph?.toFixed(2), color: '#a855f7' },
+                { icon: <Activity size={16} color="#14b8a6" />, label: 'Capteurs', value: zone.sensor_count, color: '#14b8a6' },
               ].map((m, i) => (
                 <div key={i} style={{
                   padding: '14px 8px', textAlign: 'center',
                   borderRight: i < 4 ? '1px solid #f1f5f9' : 'none',
                 }}>
-                  <div style={{marginBottom:4}}>{m.icon}</div>
-                  <div style={{fontSize:10, color:'#94a3b8', marginBottom:4}}>{m.label}</div>
-                  <div style={{fontSize:15, fontWeight:700, color: m.color, fontFamily:'monospace'}}>{m.value}</div>
+                  <div style={{ marginBottom: 4 }}>{m.icon}</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 4 }}>{m.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: m.color, fontFamily: 'monospace' }}>{m.value}</div>
                 </div>
               ))}
             </div>
 
-            {/* NPK */}
+            {/* ── NPK ── */}
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
               padding: '10px 16px', gap: 8, borderBottom: '1px solid #f1f5f9',
@@ -238,25 +270,26 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                   background: 'white', borderRadius: 8, padding: '8px 12px',
                   border: '1px solid #f1f5f9', textAlign: 'center',
                 }}>
-                  <div style={{fontSize:10, color:'#94a3b8'}}>{nutrient.label}</div>
-                  <div style={{fontSize:16, fontWeight:700, color: nutrient.color, fontFamily:'monospace'}}>
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>{nutrient.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: nutrient.color, fontFamily: 'monospace' }}>
                     {nutrient.value?.toFixed(1)}
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Plant type input */}
+            {/* ── Plant type input ✅ CORRIGÉ ── */}
             <div style={{
               padding: '12px 16px', borderBottom: '1px solid #f1f5f9',
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
               <Leaf size={14} color="#16a34a" />
-              <span style={{fontSize:12, color:'#64748b', whiteSpace:'nowrap'}}>Type de plante :</span>
+              <span style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>Type de plante :</span>
+              {/* ✅ value au lieu de defaultValue + initialisé depuis Firestore */}
               <input
                 type="text"
                 placeholder="ex: Tomate, Blé, Maïs..."
-                defaultValue={(zone as Zone & { plant_type?: string }).plant_type || ''}
+                value={plantTypes[zoneId] || ''}
                 onChange={e => setPlantTypes(prev => ({ ...prev, [zoneId]: e.target.value }))}
                 style={{
                   flex: 1, padding: '6px 10px', borderRadius: 8,
@@ -269,16 +302,18 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                 disabled={savingPlant[zoneId]}
                 style={{
                   padding: '6px 14px', borderRadius: 8, border: 'none',
-                  background: '#16a34a', color: 'white',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  background: savingPlant[zoneId] ? '#86efac' : '#16a34a',
+                  color: 'white',
+                  fontSize: 12, fontWeight: 600, cursor: savingPlant[zoneId] ? 'not-allowed' : 'pointer',
                   whiteSpace: 'nowrap',
+                  transition: 'background 0.2s',
                 }}
               >
                 {savingPlant[zoneId] ? '...' : 'Sauvegarder'}
               </button>
             </div>
 
-            {/* Expand toggle */}
+            {/* ── Expand toggle ── */}
             <button
               onClick={() => toggleExpand(zoneId)}
               style={{
@@ -288,14 +323,15 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               }}
             >
-              {isExpanded ? <><ChevronUp size={14}/> Masquer les courbes</> : <><ChevronDown size={14}/> Voir les courbes historiques</>}
+              {isExpanded
+                ? <><ChevronUp size={14} /> Masquer les courbes</>
+                : <><ChevronDown size={14} /> Voir les courbes historiques</>}
             </button>
 
-            {/* Charts */}
+            {/* ── Charts ── */}
             {isExpanded && (
-              <div style={{padding:'16px', borderTop:'1px solid #f1f5f9'}}>
-                {/* Tabs */}
-                <div style={{display:'flex', gap:4, marginBottom:16}}>
+              <div style={{ padding: '16px', borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
                   {['Humidité', 'Température', 'EC & pH', 'NPK'].map(t => (
                     <button key={t} onClick={() => setTab(zoneId, t)} style={{
                       padding: '5px 12px', borderRadius: 8, border: 'none',
@@ -307,24 +343,22 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                 </div>
 
                 {chartData.length === 0 ? (
-                  <div style={{textAlign:'center', padding:'32px', color:'#94a3b8', fontSize:13}}>
+                  <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: 13 }}>
                     Pas encore de données historiques
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData} margin={{top:5, right:10, left:-10, bottom:5}}>
+                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="time" tick={{fontSize:10, fill:'#94a3b8'}} />
-                      <YAxis tick={{fontSize:10, fill:'#94a3b8'}} />
-                      <Tooltip
-                        contentStyle={{background:'white', border:'1px solid #e2e8f0', borderRadius:8, fontSize:12}}
-                      />
-                      <Legend wrapperStyle={{fontSize:11}} />
-                      {tab === 'Humidité' && <Line type="monotone" dataKey="Humidité" stroke="#3b82f6" strokeWidth={2} dot={false}/>}
-                      {tab === 'Température' && <Line type="monotone" dataKey="Température" stroke="#f97316" strokeWidth={2} dot={false}/>}
+                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                      <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                      <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12 }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      {tab === 'Humidité' && <Line type="monotone" dataKey="Humidité" stroke="#3b82f6" strokeWidth={2} dot={false} />}
+                      {tab === 'Température' && <Line type="monotone" dataKey="Température" stroke="#f97316" strokeWidth={2} dot={false} />}
                       {tab === 'EC & pH' && <>
-                        <Line type="monotone" dataKey="EC" stroke="#eab308" strokeWidth={2} dot={false}/>
-                        <Line type="monotone" dataKey="pH" stroke="#a855f7" strokeWidth={2} dot={false}/>
+                        <Line type="monotone" dataKey="EC" stroke="#eab308" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="pH" stroke="#a855f7" strokeWidth={2} dot={false} />
                       </>}
                     </LineChart>
                   </ResponsiveContainer>
