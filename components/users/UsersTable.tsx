@@ -34,7 +34,8 @@ export function UsersTable({ users }: UsersTableProps) {
   })
 
   return (
-    <div>
+    <div style={{ padding: '16px' }}>  {/* ✅ padding ajouté */}
+
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 16 }}>
         <Search size={15} style={{

@@ -17,9 +17,8 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      // actionCodeSettings tells Firebase where to redirect after the user clicks the link
       const actionCodeSettings = {
-        url: `${window.location.origin}/reset-password`,
+        url: `${window.location.origin}/login`,
         handleCodeInApp: false,
       }
       await sendPasswordResetEmail(auth, email, actionCodeSettings)
@@ -167,8 +166,8 @@ export default function ForgotPasswordPage() {
                     boxShadow: '0 4px 14px rgba(45,106,45,0.12)',
                   }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2d6a2d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                   </div>
 
@@ -177,7 +176,7 @@ export default function ForgotPasswordPage() {
                     color: '#0f172a', letterSpacing: '-0.5px', marginBottom: 7,
                   }}>Mot de passe oublié ?</h2>
                   <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6 }}>
-                    Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+                    Entrez votre email admin et nous vous enverrons un lien pour réinitialiser votre mot de passe.
                   </p>
                 </div>
 
@@ -235,7 +234,7 @@ export default function ForgotPasswordPage() {
                     display: 'flex', alignItems: 'center', gap: 6,
                   }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2d6a2d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M19 12H5M12 5l-7 7 7 7"/>
+                      <path d="M19 12H5M12 5l-7 7 7 7" />
                     </svg>
                     Retour à la connexion
                   </Link>
@@ -259,7 +258,7 @@ export default function ForgotPasswordPage() {
                   boxShadow: '0 8px 24px rgba(45,106,45,0.15)',
                 }}>
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2d6a2d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
+                    <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
 
@@ -308,7 +307,7 @@ export default function ForgotPasswordPage() {
                   boxSizing: 'border-box',
                 }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 12H5M12 5l-7 7 7 7"/>
+                    <path d="M19 12H5M12 5l-7 7 7 7" />
                   </svg>
                   Retour à la connexion
                 </Link>
@@ -320,3 +319,4 @@ export default function ForgotPasswordPage() {
     </>
   )
 }
+

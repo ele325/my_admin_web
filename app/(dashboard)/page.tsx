@@ -143,7 +143,7 @@ export default async function DashboardPage() {
             Système actif
           </div>
           <h1 style={{ fontFamily: 'Syne,sans-serif', fontSize: 26, fontWeight: 800, color: 'white', marginBottom: 8 }}>
-            Tableau de bord IrriSmart
+            Tableau de bord RoboCare
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, maxWidth: 400 }}>
             Gérez vos {users.length} utilisateur{users.length > 1 ? 's' : ''} et leurs {totalZones} zone{totalZones > 1 ? 's' : ''} d'irrigation en temps réel.

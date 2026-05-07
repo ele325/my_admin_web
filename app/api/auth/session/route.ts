@@ -13,19 +13,21 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = await adminAuth.verifyIdToken(idToken)
-
-    const userRef = adminDb.collection('users').doc(decoded.uid)
-    const userSnap = await userRef.get()
-
-    if (!userSnap.exists) {
-      await userRef.set({
-        uid: decoded.uid,
-        email: decoded.email ?? null,
-        fullName: decoded.name ?? '',
-        role: 'user',
-        emailVerified: decoded.email_verified ?? false,
-        createdAt: new Date(),
-      })
+    const adminSnap = await adminDb.collection('admin').doc(decoded.uid).get()
+    // Si c'est un admin backoffice, ne pas le dupliquer dans `users`
+    if (!adminSnap.exists) {
+      const userRef = adminDb.collection('users').doc(decoded.uid)
+      const userSnap = await userRef.get()
+      if (!userSnap.exists) {
+        await userRef.set({
+          uid: decoded.uid,
+          email: decoded.email ?? null,
+          fullName: decoded.name ?? '',
+          role: 'user',
+          emailVerified: decoded.email_verified ?? false,
+          createdAt: new Date(),
+        })
+      }
     }
 
     const expiresIn = 60 * 60 * 24 * 7 * 1000

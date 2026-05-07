@@ -5,8 +5,8 @@ export function proxy(request: NextRequest) {
   const session = request.cookies.get('session')?.value
   const { pathname } = request.nextUrl
 
-  // ✅ /login ET /signup sont publiques
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup')
+  // ✅ /login, /signup ET /forgot-password sont publiques
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup') || pathname.startsWith('/forgot-password')
 
   if (!session && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', request.url))

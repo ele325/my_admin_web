@@ -7,8 +7,30 @@ export interface Alert {
   zone_num: string
   type: string
   level: string
-  humidity: number
+  // Compat: l'UI existante affichait surtout l'humidité
+  humidity?: number
+  // Nouvelles alertes "hors seuil" multi-paramètres
+  param?: 'temperature' | 'humidity' | 'ph' | 'ec' | 'n' | 'p' | 'k'
+  value?: number
+  min?: number
+  max?: number
   timestamp: Timestamp
+}
+
+export type SensorParam = 'temperature' | 'humidity' | 'ph' | 'ec' | 'n' | 'p' | 'k'
+
+export interface ThresholdRange {
+  min: number
+  max: number
+}
+
+export interface Plant {
+  id?: string
+  name: string
+  description?: string
+  thresholds: Record<SensorParam, ThresholdRange>
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
 }
 
 export interface Command {
@@ -90,6 +112,8 @@ export interface Zone {
   ec: number
   n: number
   enabled: boolean
+  plant_type?: string
+  thresholds?: Record<SensorParam, ThresholdRange>
   history?: Prediction
   measures?: Measure
   sensors?: Record<string, Sensor>

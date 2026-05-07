@@ -328,10 +328,13 @@ export default function LoginPage() {
               </div>
 
               <div style={{ textAlign: 'right', marginBottom: 24 }}>
-  <span style={{ fontSize: 13, color: '#2d6a2d', cursor: 'pointer', fontWeight: 500 }}>
-    Mot de passe oublié ?
-  </span>
-</div>
+                <Link
+                  href="/forgot-password"
+                  style={{ fontSize: 13, color: '#2d6a2d', cursor: 'pointer', fontWeight: 500, textDecoration: 'none' }}
+                >
+                  Mot de passe oublié ?
+                </Link>
+              </div>
 
               {/* Bouton */}
               <button

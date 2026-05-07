@@ -23,6 +23,12 @@ export async function getAllZonesMeasures() {
     const zones = []
 
     for (const zoneDoc of zonesSnap.docs) {
+      const plantDoc = await adminDb
+        .collection('users').doc(userDoc.id)
+        .collection('zones').doc(zoneDoc.id)
+        .collection('plante').doc('current')
+        .get()
+
       const measuresSnap = await adminDb
         .collection('users').doc(userDoc.id)
         .collection('zones').doc(zoneDoc.id)
@@ -35,7 +41,11 @@ export async function getAllZonesMeasures() {
 
       zones.push({
         zoneId: zoneDoc.id,
-        zoneData: toPlain(zoneDoc.data()),
+        zoneData: toPlain({
+          ...zoneDoc.data(),
+          plant_type: plantDoc.data()?.plant_type || undefined,
+          thresholds: plantDoc.data()?.thresholds || undefined,
+        }),
         lastMeasure: measures[0] || null,
         measures,
       })

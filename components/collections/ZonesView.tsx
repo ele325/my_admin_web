@@ -20,8 +20,6 @@ interface ZonesViewProps {
   measuresMap: Record<string, Measure[]>
 }
 
-type ZoneWithPlant = Zone & { plant_type?: string }
-
 function getHealthColor(sante: number) {
   if (sante >= 8) return { bg: '#dcfce7', text: '#16a34a' }
   if (sante >= 5) return { bg: '#fef9c3', text: '#ca8a04' }
@@ -39,19 +37,8 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<Record<string, string>>({})
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
-  const [savingPlant, setSavingPlant] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const { toast } = useToast()
-
-  // ✅ CORRECTION 1 — initialiser plantTypes avec les valeurs existantes de Firestore
-  const [plantTypes, setPlantTypes] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {}
-    Object.entries(zones).forEach(([zoneId, zone]) => {
-      const z = zone as ZoneWithPlant
-      if (z.plant_type) initial[zoneId] = z.plant_type
-    })
-    return initial
-  })
 
   const toggleExpand = (zoneId: string) => {
     setExpandedZones(prev => {
@@ -79,45 +66,6 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
       toast({ title: 'Erreur', description: 'Impossible de mettre à jour la zone', variant: 'destructive' })
     } finally {
       setLoadingStates(prev => ({ ...prev, [zoneId]: false }))
-    }
-  }
-
-  // ✅ CORRECTION 2 — handleSavePlantType corrigé
-  const handleSavePlantType = async (zoneId: string) => {
-    // Permet la valeur vide string mais bloque undefined
-    const plantType = plantTypes[zoneId]
-    if (plantType === undefined) {
-      toast({ title: 'Erreur', description: 'Veuillez saisir un type de plante', variant: 'destructive' })
-      return
-    }
-
-    setSavingPlant(prev => ({ ...prev, [zoneId]: true }))
-    try {
-      const res = await fetch(`/api/users/${uid}/zones/${zoneId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plant_type: plantType }),
-      })
-
-      // ✅ CORRECTION 3 — afficher l'erreur exacte de l'API
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        console.error('❌ Erreur API:', res.status, data)
-        throw new Error(data?.error || `Erreur ${res.status}`)
-      }
-
-      console.log('✅ plant_type sauvegardé:', plantType, 'pour zone:', zoneId)
-      toast({ title: '✅ Type de plante sauvegardé !' })
-      router.refresh()
-    } catch (e) {
-      console.error('❌ handleSavePlantType:', e)
-      toast({
-        title: 'Erreur',
-        description: e instanceof Error ? e.message : 'Impossible de sauvegarder',
-        variant: 'destructive'
-      })
-    } finally {
-      setSavingPlant(prev => ({ ...prev, [zoneId]: false }))
     }
   }
 
@@ -184,11 +132,8 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
                   <Leaf size={18} color="#16a34a" />
                 </div>
                 <div>
-                  {/* ✅ Affiche "Tomate" si plant_type défini, sinon "zone1" */}
                   <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', fontFamily: 'monospace' }}>
-                    {plantTypes[zoneId]
-                      ? `${zoneId} — ${plantTypes[zoneId]}`
-                      : zoneId}
+                    {zone.plant_type ? `${zoneId} — ${zone.plant_type}` : zoneId}
                   </div>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                     Mis à jour : {formatTime(zone.last_updated)}
@@ -197,6 +142,17 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => router.push(`/plants?uid=${encodeURIComponent(uid)}&zoneId=${encodeURIComponent(zoneId)}`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 12px', borderRadius: 8, border: 'none',
+                    background: '#dbeafe', color: '#2563eb',
+                    cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                  }}
+                >
+                  🌿 Choisir le type de plante
+                </button>
                 <span style={{
                   background: health.bg, color: health.text,
                   borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600,
@@ -278,38 +234,47 @@ export function ZonesView({ uid, zones, measuresMap }: ZonesViewProps) {
               ))}
             </div>
 
-            {/* ── Plant type input ✅ CORRIGÉ ── */}
+            {/* ── Plant assignment info ── */}
             <div style={{
               padding: '12px 16px', borderBottom: '1px solid #f1f5f9',
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
             }}>
-              <Leaf size={14} color="#16a34a" />
-              <span style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>Type de plante :</span>
-              {/* ✅ value au lieu de defaultValue + initialisé depuis Firestore */}
-              <input
-                type="text"
-                placeholder="ex: Tomate, Blé, Maïs..."
-                value={plantTypes[zoneId] || ''}
-                onChange={e => setPlantTypes(prev => ({ ...prev, [zoneId]: e.target.value }))}
-                style={{
-                  flex: 1, padding: '6px 10px', borderRadius: 8,
-                  border: '1px solid #e2e8f0', fontSize: 13, color: '#0f172a',
-                  outline: 'none',
-                }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <Leaf size={14} color="#16a34a" />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                    Plante :
+                    <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                      {' '}{zone.plant_type || '—'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                    {zone.thresholds ? (
+                      <span>Seuils enregistrés : oui</span>
+                    ) : (
+                      <span style={{
+                        color: '#dc2626',
+                        fontWeight: 700,
+                        background: '#fee2e2',
+                        border: '1px solid #fecaca',
+                        borderRadius: 999,
+                        padding: '2px 8px',
+                      }}>
+                        Seuils non configurés
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
               <button
-                onClick={() => handleSavePlantType(zoneId)}
-                disabled={savingPlant[zoneId]}
+                onClick={() => router.push(`/plants?uid=${encodeURIComponent(uid)}&zoneId=${encodeURIComponent(zoneId)}`)}
                 style={{
-                  padding: '6px 14px', borderRadius: 8, border: 'none',
-                  background: savingPlant[zoneId] ? '#86efac' : '#16a34a',
-                  color: 'white',
-                  fontSize: 12, fontWeight: 600, cursor: savingPlant[zoneId] ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'background 0.2s',
+                  padding: '7px 12px', borderRadius: 10, border: '1px solid #bfdbfe',
+                  background: '#eff6ff', color: '#2563eb',
+                  cursor: 'pointer', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap',
                 }}
               >
-                {savingPlant[zoneId] ? '...' : 'Sauvegarder'}
+                Modifier
               </button>
             </div>
 
